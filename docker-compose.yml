@@ -31,4 +31,6 @@ services:
 volumes:
   mongo-data:
     name: gamemaster-mongo-data
+  node-modules:
+    name: node-modules
 

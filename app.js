@@ -1,7 +1,6 @@
 const express = require('express');
 const morgan = require('morgan');
 const bodyParser = require('body-parser');
-const mysql = require('mysql');
 const MongoClient = require('mongodb').MongoClient;
 
 const app = express();
