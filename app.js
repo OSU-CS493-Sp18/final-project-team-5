@@ -14,6 +14,8 @@ const mongoPassword = process.env.MONGO_PASSWORD;
 
 const mongoURL = `mongodb://${mongoUser}:${mongoPassword}@${mongoHost}:${mongoPort}/${mongoDBName}`
 
+app.use(morgan('dev'));
+app.use(bodyParser.json());
 app.use('/', require('./routes'));
 
 app.use('*', function (req, res, next) {
