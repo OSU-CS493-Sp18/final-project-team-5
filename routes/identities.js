@@ -26,6 +26,7 @@ function insertIdentity(character, mongoDB) {
             return Promise.resolve(result.insertedId);
         })
 }
+
 // POST identities/
 router.post('/', function (req, res) {
     const mongoDB = req.app.locals.mongoDB;
@@ -61,9 +62,53 @@ router.post('/', function (req, res) {
 
 });
 
+function updateIdentity(character, identityId, mongoDB){
+    const identityCollection = mongoDB.collection('identities');
+    return identityCollection
+        .replaceOne({_id: identityId}, character)
+        .then((results) => {
+            return Promise.resolve(results);
+        });
+}
+
 // PUT identities/:id
 router.put('/:id', function (req, res) {
+    const mongoDB = req.app.locals.mongoDB;
+    console.log(req.body);
 
+    if (validIdentity(req.body)) {
+        getIdentityById(req.params.identityId, mongoDB)
+            .then((exists) => {
+                if(!exists) {
+                    return updateIdentity(req.body, mongoDB);
+                } else {
+                    return Promise.reject(400);
+                }
+            })
+            .then((updateIdentity) => {
+                res.status(200).json({
+                    links: {
+                        user: '/identities/${req.params.identityId}'
+                    }
+                });
+            })
+            .catch((err) => {
+                if (err == 401) {
+                    res.status(401).json({
+                        error: "Invalid identity request"
+                    })
+                } else {
+                    console.log("--err: ", err);
+                    res.status(500).json({
+                        error: "Failed to fetch identity"
+                    });
+                }
+            });
+    } else {
+        res.status(400).json({
+            error: "Request doesn't contain a valid identity"
+        })
+    }
 
 });
 
