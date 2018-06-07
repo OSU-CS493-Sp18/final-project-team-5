@@ -33,7 +33,7 @@ router.post('/', function (req, res) {
     console.log(req.body);
 
     if (validIdentity(req.body)) {
-        getIdentityById(req.params.identityId, mongoDB)
+        getIdentityById(req.body.name, mongoDB)
             .then((exists) => {
                 if(!exists) {
                     return insertIdentity(req.body, mongoDB);
@@ -45,7 +45,7 @@ router.post('/', function (req, res) {
                 res.status(201).json({
                     _id: id,
                     links: {
-                        user: '/identities/${id}'
+                        user: `/identities/${id}`
                     }
                 });
             })
@@ -72,7 +72,7 @@ function updateIdentity(character, identityId, mongoDB){
 }
 
 // PUT identities/:id
-router.put('/:id', function (req, res) {
+router.put('/:identityId', requireAuthentication, function (req, res) {
     const mongoDB = req.app.locals.mongoDB;
     console.log(req.body);
 
@@ -88,12 +88,12 @@ router.put('/:id', function (req, res) {
             .then((updateIdentity) => {
                 res.status(200).json({
                     links: {
-                        user: '/identities/${req.params.identityId}'
+                        identity: `/identities/${req.params.identityId}`
                     }
                 });
             })
             .catch((err) => {
-                if (err == 401) {
+                if (err === 401) {
                     res.status(401).json({
                         error: "Invalid identity request"
                     })
@@ -122,7 +122,7 @@ function getIdentity(mongoDB) {
     const identityCollection = mongoDB.collection('identities');
     return identityCollection
         .find()
-        .project({ "_id": false })
+        .project({"_id": false })
         .toArray()
         .then((results) => {
             return Promise.resolve(results);
@@ -132,7 +132,7 @@ function getIdentity(mongoDB) {
 function getIdentityById(identityId, mongodb) {
     const identityCollection = mongodb.collection('identities');
     return identityCollection
-        .find( { _id: ObjectId(identityId) })
+        .find( {_id: ObjectId(identityId)})
         .toArray()
         .then((results) => {
             return Promise.resolve(results[0]);
@@ -161,7 +161,7 @@ router.get('/', function (req, res) {
 });
 
 // GET identities by id
-router.get('/:id', function (req, res) {
+router.get('/:identityId', function (req, res) {
 
 
 });
