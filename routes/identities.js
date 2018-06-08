@@ -10,6 +10,74 @@ function validIdentity(character) {
         character.personality && character.classes && character.alignment && character.money;
 }
 
+function getIdentities(mongoDB) {
+    const identityCollection = mongoDB.collection('identities');
+    return identityCollection
+        .find()
+        .project({"_id": false })
+        .toArray()
+        .then((results) => {
+            return Promise.resolve(results);
+        });
+}
+
+// GET identities/
+router.get('/', function (req, res) {
+    console.log("-- GET request /identities/");
+    const mongoDB = req.app.locals.mongoDB;
+    getIdentities(mongoDB)
+        .then((player) => {
+            res.status(200).json({
+                name: player.name,
+                title: player.title,
+                classes: player.classes,
+                alignment: player.alignment
+            });
+        })
+        .catch((err) => {
+            console.log("--err: ", err);
+            res.status(500).json({
+                error: "Unable to access identities data."
+            });
+        });
+});
+
+function getIdentityById(identityId, mongodb) {
+    const identityCollection = mongodb.collection('identities');
+    return identityCollection
+        .find( {_id: ObjectId(identityId)})
+        .toArray()
+        .then((results) => {
+            return Promise.resolve(results[0]);
+        });
+}
+
+// GET identities by id
+router.get('/:identityId', requireAuthentication , function (req, res) {
+    const mongoDB = req.app.locals.mongoDB;
+    return getIdentityById(req.params.identityId, mongoDB)
+        .then((results) => {
+            if (results) {
+                res.status(200).send(results);
+            } else {
+                return Promise.reject(401);
+            }
+        })
+        .catch((err) => {
+            console.log("--error: ", err);
+            if (err === 401) {
+                res.status(401).json({
+                    error: "Invalid identity request."
+                });
+            } else {
+                console.log("--err: ", err);
+                res.status(500).json({
+                    error: "Failed to fetch identity."
+                });
+            }
+        });
+});
+
 function insertIdentity(character, mongoDB) {
     const identityDocument = {
         name: character.name,
@@ -27,7 +95,10 @@ function insertIdentity(character, mongoDB) {
         })
 }
 
-// POST identities/
+
+/*
+ * POST '/': Add new identity
+ */
 router.post('/', function (req, res) {
     const mongoDB = req.app.locals.mongoDB;
     console.log(req.body);
@@ -57,7 +128,7 @@ router.post('/', function (req, res) {
     } else {
         res.status(400).json({
             error: "Request doesn't contain a valid identity"
-        })
+        });
     }
 
 });
@@ -80,7 +151,7 @@ router.put('/:identityId', requireAuthentication, function (req, res) {
         getIdentityById(req.params.identityId, mongoDB)
             .then((exists) => {
                 if(!exists) {
-                    return updateIdentity(req.body, mongoDB);
+                    return updateIdentity(req.params.identityId, mongoDB);
                 } else {
                     return Promise.reject(400);
                 }
@@ -96,7 +167,7 @@ router.put('/:identityId', requireAuthentication, function (req, res) {
                 if (err === 401) {
                     res.status(401).json({
                         error: "Invalid identity request"
-                    })
+                    });
                 } else {
                     console.log("--err: ", err);
                     res.status(500).json({
@@ -107,61 +178,49 @@ router.put('/:identityId', requireAuthentication, function (req, res) {
     } else {
         res.status(400).json({
             error: "Request doesn't contain a valid identity"
-        })
+        });
     }
 
 });
 
-// DELETE identities/:id
-router.delete('/:id', function (req, res) {
-
-
-});
-
-function getIdentity(mongoDB) {
+function deleteIdentity(identityId, mongoDB) {
     const identityCollection = mongoDB.collection('identities');
     return identityCollection
-        .find()
-        .project({"_id": false })
-        .toArray()
+        .remove({_id: ObjectId(identityId)}, {justOne: true})
         .then((results) => {
-            return Promise.resolve(results);
+           return Promise.resolve(results);
         });
 }
 
-function getIdentityById(identityId, mongodb) {
-    const identityCollection = mongodb.collection('identities');
-    return identityCollection
-        .find( {_id: ObjectId(identityId)})
-        .toArray()
-        .then((results) => {
-            return Promise.resolve(results[0]);
-        });
-}
-
-// GET identities/
-router.get('/', function (req, res) {
-    console.log("-- GET request /identities/");
+// DELETE identities/:id
+router.delete('/:identityId', function (req, res) {
     const mongoDB = req.app.locals.mongoDB;
-    getIdentity(mongoDB)
-        .then((player) => {
-            res.status(200).json({
-                name: player.name,
-                title: player.title,
-                classes: player.classes,
-                alignment: player.alignment
-            });
+    getIdentityById(req.params.identityId, mongoDB)
+        .then((exists) => {
+            if(exists) {
+                return deleteIdentity(req.params.identityId, mongoDB);
+            } else {
+                return Promise.reject(401);
+            }
+        })
+        .then((deleted) => {
+            if(deleted) {
+                res.status(204).end();
+            } else {
+                return Promise.reject(500);
+            }
         })
         .catch((err) => {
-            console.log("--err: ", err);
-            res.status(500).json({
-                error: "Unable to access identities data."
-            });
+            if (err === 401) {
+                res.status(401).json({
+                    error: "Invalid delete identity request."
+                });
+            } else {
+                console.log("--err: ", err);
+                res.status(500).json({
+                    error: "Failed to fetch identity to delete."
+                });
+            }
         });
-});
-
-// GET identities by id
-router.get('/:identityId', function (req, res) {
-
 
 });
