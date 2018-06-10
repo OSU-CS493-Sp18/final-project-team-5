@@ -282,11 +282,18 @@ router.get('/:regionId/entities', function (req, res) {
 });
 
 //add entity to region
+  // Make sure to check region existance via getRegionById
 function addEntityToRegion(entityId, regionId, mongoDB) {
   const regionCollection = mongoDB.collection('regions');
   return regionCollection
-    .replaceOne({_id: regionId}, {$set: {}})
+    .update(
+      { _id: regionId},
+      { $addToSet: {entities: entityId} })
     .then((results) => {
       return Promise.resolve(results);
     });
 }
+
+exports.router = router;
+exports.getRegionById = getRegionById;
+exports.addEntityToRegion = addEntityToRegion;
