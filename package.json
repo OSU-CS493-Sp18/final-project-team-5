@@ -1,7 +1,8 @@
 {
   "name": "game-master",
   "version": "1.0.0",
-  "description": "",
+  "description": "This API will help a GM (game master) organize a role playing world",
+  "repository": "https://github.com/OSU-CS493-Sp18/final-project-team-5/",
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
