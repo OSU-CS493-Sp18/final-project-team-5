@@ -1,15 +1,19 @@
 const router = require('express').Router();
 const ObjectId = require('mongodb').ObjectId;
 
+function validActions(actions) {
+  return actions && actions[0].attack && actions[0].weapon && actions[0].damage;
+}
+
 function validEntity(entity){
-  return entity && entity.name && entity.region;
+  return entity && entity.name && entity.health && entity.actions && validActions(entity.actions);
 }
 
 function getEntities(mongoDB) {
   const entityCollection = mongoDB.collection('entities');
   return entityCollection
     .find()
-    .project({"_id": false, "regions": false})
+    .project({})
     .toArray()
     .then((results) => {
       return Promise.resolve(results);
@@ -26,11 +30,22 @@ function getEntityById(entityId, mongoDB) {
     });
 }
 
-function insertEntity(mongoDB) {
-  const entityCollection = mongoDB.collection('entity');
+function getEntityByName(entityName, mongoDB) {
+  const entityCollection = mongoDB.collection('entities');
+  return entityCollection
+    .find({name: entityName})
+    .toArray()
+    .then((results) => {
+      return Promise.resolve(results[0]);
+    });
+}
+
+function insertEntity(entity, mongoDB) {
+  const entityCollection = mongoDB.collection('entities');
   const entityDocument = {
     name: entity.name,
-    region: entity.region
+    health: entity.health,
+    actions: entity.actions
   };
   return entityCollection.insertOne(entityDocument)
     .then((result) => {
@@ -38,8 +53,17 @@ function insertEntity(mongoDB) {
     });
 }
 
+function updateEntity(entityId, entity, mongoDB) {
+  const entityCollection = mongoDB.collection('entities');
+  return entityCollection
+    .replaceOne({_id: ObjectId(entityId)}, entity)
+    .then((result) => {
+      return Promise.resolve(result.insertedID);
+    });
+}
+
 function deleteEntity(entityId, mongoDB) {
-  const entityCollection = mongoDB.collection('entity');
+  const entityCollection = mongoDB.collection('entities');
   return entityCollection
     .remove({_id: ObjectId(endityId)}, {justOne: true})
     .then((results) => {
@@ -47,9 +71,9 @@ function deleteEntity(entityId, mongoDB) {
     });
 }
 
-
+// Unnecessary
 function getRegionsByEntity(entityId, regionId, mongoDB) {
-  const entityCollection = mongoDB.collection('entity');
+  const entityCollection = mongoDB.collection('entities');
   return entityCollection
   .find(regionId)
   .toArray()
@@ -61,17 +85,30 @@ function getRegionsByEntity(entityId, regionId, mongoDB) {
 // Add new entity
 router.post('/', function (req, res) {
   const mongoDB = req.app.locals.mongoDB;
-  insertEntity(mongoDB)
-  collection.insertOne({})
+  getEntityByName(req.body.name, mongoDB)
+    .then((exists) => {
+      if(!exists) {
+        return insertEntity(req.body, mongoDB);
+      } else {
+        return Promise.reject(400);
+      }
+    })
     .then((result) => {
       res.status(201).json({
         _id: result.insertedId
       });
     })
     .catch((err) => {
-      res.status(500).json({
-        error: "Failed to insert a new entity."
-      });
+      if (err === 400) {
+        res.status(400).json({
+          error: "Entity exists already."
+        });
+      } else {
+        console.log("--err:", err);
+        res.status(500).json({
+          error: "Failed to insert a new entity."
+        });
+      }
     });
 });
 
@@ -101,14 +138,15 @@ router.get('/:id', function (req, res) {
   const mongoDB = req.app.locals.mongoDB;
   console.log("-- GET request /entities/" + req.params.id);
   getEntityById(req.params.id, mongoDB)
-  .then((results) => {
-    res.status(200).json(results);
-  })
-  .catch((err) => {
-    res.status(500).json({
-      error: "Failed to fetch the entity."
+    .then((results) => {
+      res.status(200).json(results);
+    })
+    .catch((err) => {
+      console.log("--err:", err);
+      res.status(500).json({
+        error: "Failed to fetch the entity."
+      });
     });
-  });
 });
 
 // Update an existing entity by id.
@@ -116,13 +154,31 @@ router.put('/:id', function (req, res) {
   const mongoDB = req.app.locals.mongoDB;
   console.log("-- PUT request /entities/" + req.params.id);
   getEntityById(req.params.id, mongoDB)
+  .then((exists) => {
+    if(exists) {
+      return updateEntity(req.params.id, req.body, mongoDB);
+    } else {
+      return Promise.reject(401);
+    }
+  })
   .then((results) => {
-    res.status(200).json(results);
+    res.status(200).json({
+      links: {
+        entity: `/entities/${req.params.id}`
+      }
+    });
   })
   .catch((err) => {
-    res.status(500).json({
-      error: "Failed to fetch the entity."
-    });
+    if (err === 401) {
+      res.status(401).json({
+        error: "Entity not found."
+      });
+    } else {
+      console.log("--err:", err);
+      res.status(500).json({
+        error: "Failed to fetch the entity."
+      });
+    }
   });
 });
 
@@ -131,13 +187,31 @@ router.delete('/:id', function (req, res) {
   const mongoDB = req.app.locals.mongoDB;
   console.log("-- DELETE request /entities/id:" + req.params.id);
   getEntityById(req.params.id, mongoDB)
-  .then((results) => {
-    res.status(200).json(results);
+  .then((exists) => {
+    if (exists) {
+      return deleteEntity(req.params.id, mongoDB);
+    } else {
+      return Promise.reject(401);
+    }
+  })
+  .then((deleted) => {
+    if(deleted){
+      res.status(204).end();
+    } else {
+      return Promise.reject(500);
+    }
   })
   .catch((err) => {
-    res.status(500).json({
-      error: "Failed to fetch the entity."
-    });
+    if (err === 401) {
+      res.status(401).json({
+        error: "Entity not found"
+      });
+    } else {
+      console.log("--err:", err);
+      res.status(500).json({
+        error: "Failed to fetch the entity."
+      });
+    }
   });
 });
 
@@ -151,6 +225,7 @@ router.get('/:regionid', function (req, res) {
     res.status(200).json(results);
   })
   .catch((err) => {
+    console.log("--err:", err);
     res.status(500).json({
       error: "Failed to fetch the requested regions."
     });
@@ -161,3 +236,4 @@ router.get('/:regionid', function (req, res) {
 
 exports.router = router;
 exports.getEntityById = getEntityById;
+exports.getEntityByName = getEntityByName;

@@ -6,7 +6,7 @@ services:
     restart: always
     command: >
       bash -c "npm install
-      && npm run dev"
+      && npm start"
     ports:
       - 8000:8000
     volumes:
@@ -33,4 +33,3 @@ volumes:
     name: gamemaster-mongo-data
   node-modules:
     name: node-modules
-

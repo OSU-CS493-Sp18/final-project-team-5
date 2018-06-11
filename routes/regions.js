@@ -83,7 +83,7 @@ router.post('/', function (req, res) {
   console.log(req.body);
 
   if (validateRegionObject(req.body)) {
-    getRegionById(req.body.name, mongoDB)
+    getRegionByName(req.body.name, mongoDB)
       .then((exists) => {
         if (!exists) {
           return insertRegion(req.body, mongoDB);
@@ -95,14 +95,21 @@ router.post('/', function (req, res) {
         res.status(201).json({
           _id: id,
           links: {
-            user: `/regions/${id}`
+            region: `/regions/${id}`
           }
         });
       })
       .catch((err) => {
-        res.status(500).json({
-          error: "Failed to insert a new region."
-        });
+        if (err === 400) {
+          res.status(400).json({
+            error: "Region already exists."
+          });
+        } else {
+          console.log("--err: ", err);
+          res.status(500).json({
+            error: "Failed to insert a new region."
+          });
+        }
       });
   } else {
     res.status(400).json({
@@ -235,42 +242,43 @@ router.delete('/:regionId', requireAuthentication, function (req, res) {
     });
 });
 
-function getRegionEntities(entities, mongoDB) {
-  const entityCollection = mongoDB.collection('entities');
-  return entityCollection
-    .find({_id: {$in: entities}})
+function getRegionIdenties(identities, mongoDB) {
+  const identityCollection = mongoDB.collection('identities');
+  return identityCollection
+    .find({_id: {$in: identities}})
     .toArray()
     .then((results) => {
       return Promise.resolve(results);
     });
 }
 
-//GET/entities gets a regions entities
-router.get('/:regionId/entities', function (req, res) {
+//GET/identities gets a regions identities
+  //All characters in region
+router.get('/:regionId/identities', function (req, res) {
   const mongoDB = req.app.locals.mongoDB;
   getRegionById(req.params.regionId, mongoDB)
     .then((region) => {
       if (region) {
-        return region.entities.map(x => ObjectId(x));
+        return region.identities.map(x => ObjectId(x));
       } else {
         return Promise.reject(401);
       }
     })
-    .then((entityIds) => {
-      getRegionEntities(entityIds, mongoDB);
+    .then((identityIds) => {
+      getRegionIdenties(identityIds, mongoDB);
     })
-    .then((entities) => {
-      if(entities) {
+    .then((identities) => {
+      if(identities) {
         res.status(200).json({
           _id: req.params.regionId,
-          entities: entities
+          identities: identities
         });
       }
     })
     .catch((err) => {
       if (err === 401) {
         res.status(401).json({
-          error: "Region does not exist or has no entities."
+          error: "Region does not exist or has no identities."
         });
       } else {
         console.log("--err: ", err);
@@ -281,14 +289,25 @@ router.get('/:regionId/entities', function (req, res) {
     });
 });
 
-//add entity to region
+//add or remove identity to region
   // Make sure to check region existance via getRegionById
-function addEntityToRegion(entityId, regionId, mongoDB) {
+function addIdentityToRegion(identityName, regionId, mongoDB) {
   const regionCollection = mongoDB.collection('regions');
   return regionCollection
     .update(
       { _id: regionId},
-      { $addToSet: {entities: entityId} })
+      { $addToSet: {identities: identityName} })
+    .then((results) => {
+      return Promise.resolve(results);
+    });
+}
+
+function removeIdentityFromRegion(identityName, mongoDB) {
+  const regionCollection = mongoDB.collection('regions');
+  return regionCollection
+    .update(
+      { },
+      { $pull: {identities: identityName} })
     .then((results) => {
       return Promise.resolve(results);
     });
@@ -296,4 +315,6 @@ function addEntityToRegion(entityId, regionId, mongoDB) {
 
 exports.router = router;
 exports.getRegionById = getRegionById;
-exports.addEntityToRegion = addEntityToRegion;
+exports.getRegionByName = getRegionByName;
+exports.addIdentityToRegion = addIdentityToRegion;
+exports.removeIdentityFromRegion = removeIdentityFromRegion;
