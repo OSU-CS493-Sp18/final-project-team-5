@@ -66,7 +66,7 @@ function insertRegion(region, mongoDB) {
       disposition: region.population.disposition
     },
     cities: region.cities,
-    entities: []
+    identities: []
   };
   const regionCollection = mongoDB.collection('regions');
   return regionCollection.insertOne(regionDocument)
@@ -243,9 +243,10 @@ router.delete('/:regionId', requireAuthentication, function (req, res) {
 });
 
 function getRegionIdenties(identities, mongoDB) {
+  console.log("Inside getRegionIdenties: ", identities);
   const identityCollection = mongoDB.collection('identities');
   return identityCollection
-    .find({_id: {$in: identities}})
+    .find( { name: {$in: identities} } )
     .toArray()
     .then((results) => {
       return Promise.resolve(results);
@@ -259,13 +260,13 @@ router.get('/:regionId/identities', function (req, res) {
   getRegionById(req.params.regionId, mongoDB)
     .then((region) => {
       if (region) {
-        return region.identities.map(x => ObjectId(x));
+        return region.identities;
       } else {
         return Promise.reject(401);
       }
     })
-    .then((identityIds) => {
-      getRegionIdenties(identityIds, mongoDB);
+    .then((identityNames) => {
+      return getRegionIdenties(identityNames, mongoDB);
     })
     .then((identities) => {
       if(identities) {
@@ -273,6 +274,9 @@ router.get('/:regionId/identities', function (req, res) {
           _id: req.params.regionId,
           identities: identities
         });
+      } else {
+        console.log("here?")
+        return Promise.reject(401);
       }
     })
     .catch((err) => {
@@ -307,7 +311,8 @@ function removeIdentityFromRegion(identityName, mongoDB) {
   return regionCollection
     .update(
       { },
-      { $pull: {identities: identityName} })
+      { $pull: {identities: identityName} },
+      { multi: true})
     .then((results) => {
       return Promise.resolve(results);
     });

@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const ObjectId = require('mongodb').ObjectId;
+const { requireAuthentication } = require('../lib/auth');
 
 function validActions(actions) {
   return actions && actions[0].attack && actions[0].weapon && actions[0].damage;
@@ -49,7 +50,7 @@ function insertEntity(entity, mongoDB) {
   };
   return entityCollection.insertOne(entityDocument)
     .then((result) => {
-      return Promise.resolve(result.insertedID);
+      return Promise.resolve(result.insertedId);
     });
 }
 
@@ -58,14 +59,14 @@ function updateEntity(entityId, entity, mongoDB) {
   return entityCollection
     .replaceOne({_id: ObjectId(entityId)}, entity)
     .then((result) => {
-      return Promise.resolve(result.insertedID);
+      return Promise.resolve(result.upsertedId);
     });
 }
 
 function deleteEntity(entityId, mongoDB) {
   const entityCollection = mongoDB.collection('entities');
   return entityCollection
-    .remove({_id: ObjectId(endityId)}, {justOne: true})
+    .remove({_id: ObjectId(entityId)}, {justOne: true})
     .then((results) => {
       return Promise.resolve(results);
     });
@@ -93,9 +94,9 @@ router.post('/', function (req, res) {
         return Promise.reject(400);
       }
     })
-    .then((result) => {
+    .then((id) => {
       res.status(201).json({
-        _id: result.insertedId
+        _id: id
       });
     })
     .catch((err) => {
@@ -149,8 +150,25 @@ router.get('/:id', function (req, res) {
     });
 });
 
+function updateEntityOfIdentity(entity, mongoDB) {
+  const identityCollection = mongoDB.collection('identities');
+  const entityDocument = {
+    name: entity.name,
+    health: entity.health,
+    actions: entity.actions
+  };
+  return identityCollection
+    .update(
+      { 'entity.name': entity.name },
+      { $set: {"entity.actions": entity.actions, "entity.health": entity.health }}
+    )
+    .then((results) => {
+       return Promise.resolve(results);
+    });
+}
+
 // Update an existing entity by id.
-router.put('/:id', function (req, res) {
+router.put('/:id', requireAuthentication, function (req, res) {
   const mongoDB = req.app.locals.mongoDB;
   console.log("-- PUT request /entities/" + req.params.id);
   getEntityById(req.params.id, mongoDB)
@@ -160,6 +178,9 @@ router.put('/:id', function (req, res) {
     } else {
       return Promise.reject(401);
     }
+  })
+  .then((id) => {
+    return updateEntityOfIdentity(req.body, mongoDB);
   })
   .then((results) => {
     res.status(200).json({

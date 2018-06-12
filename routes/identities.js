@@ -15,7 +15,7 @@ function getIdentities(mongoDB) {
     const identityCollection = mongoDB.collection('identities');
     return identityCollection
         .find()
-        .project({"appearance":false, "personality":false, "money":false})
+        .project({"entity":false,"appearance":false, "personality":false, "money":false})
         .toArray()
         .then((results) => {
             return Promise.resolve(results);
@@ -262,17 +262,14 @@ router.delete('/:identityId', function (req, res) {
     getIdentityById(req.params.identityId, mongoDB)
         .then((exists) => {
             if(exists) {
+              console.log("--removing", exists.name);
                 return removeIdentityFromRegion(exists.name, mongoDB);
             } else {
                 return Promise.reject(401);
             }
         })
         .then((identityDeleted) =>  {
-          if(identityDeleted) {
-            return deleteIdentity(req.params.identityId, mongoDB);
-          } else {
-            return Promise.reject(500);
-          }
+          return deleteIdentity(req.params.identityId, mongoDB);
         })
         .then((deleted) => {
             if(deleted) {
@@ -294,3 +291,5 @@ router.delete('/:identityId', function (req, res) {
             }
         });
 });
+
+exports.router = router;
